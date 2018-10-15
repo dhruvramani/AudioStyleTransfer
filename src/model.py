@@ -48,7 +48,6 @@ class decode(torch.nn.Module):
             x = torch.cat([x2, x1], dim=1)
         return self.conv(x)
 
-
 class TransformationNetwork(torch.nn.Module):
     def __init__(self, n_channels):
         super(TransformationNetwork, self).__init__()
@@ -75,3 +74,40 @@ class TransformationNetwork(torch.nn.Module):
         h = self.d4(h, h1)
         return self.outc(h)
 
+class Flatten(torch.nn.Module):
+    def forward(self, x):
+        return x.view(x.size()[0], -1)
+
+class SoundNet(torch.nn.Module):
+    # KL Divergence Loss - Refer https://github.com/Kajiyu/Modern_SoundNet/blob/master/soundnet.ipynb 
+    def __init__(self):
+        super(SoundNet, self).__init__()
+        self.conv1 = torch.nn.Conv1d(1, 16, 64, stride=2, padding=32)
+        self.pool1 = torch.nn.MaxPool1d(8, stride=1, padding=0)
+        self.conv2 = torch.nn.Conv1d(16, 32, 32, stride=2, padding=16)
+        self.pool2 = torch.nn.MaxPool1d(8, stride=1, padding=0)
+        self.conv3 = torch.nn.Conv1d(32, 64, 16, stride=2, padding=8)
+        self.conv4 = torch.nn.Conv1d(64, 128, 8, stride=2, padding=4)
+        self.conv5 = torch.nn.Conv1d(128, 256, 4, stride=2, padding=2)
+        self.pool5 = torch.nn.MaxPool1d(4, stride=1, padding=0)
+        self.conv6 = torch.nn.Conv1d(256, 512, 4, stride=2, padding=2)
+        self.conv7 = torch.nn.Conv1d(512, 1024, 4, stride=2, padding=2)
+        self.conv8_1 = torch.nn.Conv1d(1024, 1000, 4, stride=2, padding=0)
+        self.conv8_2 = torch.nn.Conv1d(1024, 401, 4, stride=2, padding=0)
+        self.fc1 = torch.nn.Linear(859000, 1000)
+        self.fc2 = torch.nn.Linear(344459, 365)
+
+    def forward(self, input_wav):
+        x = self.pool1(F.relu(torch.nn.BatchNorm1d(16)(self.conv1(input_wav))))
+        x = self.pool2(F.relu(torch.nn.BatchNorm1d(32)(self.conv2(x))))
+        x = F.relu(torch.nn.BatchNorm1d(64)(self.conv3(x)))
+        x = F.relu(torch.nn.BatchNorm1d(128)(self.conv4(x)))
+        x = self.pool5(F.relu(torch.nn.BatchNorm1d(256)(self.conv5(x))))
+        x = F.relu(torch.nn.BatchNorm1d(512)(self.conv6(x)))
+        x = F.relu(torch.nn.BatchNorm1d(1024)(self.conv7(x)))
+        x_object = Flatten()(F.relu(self.conv8_1(x)))
+        x_place = Flatten()(F.relu(self.conv8_2(x)))
+        x_object = self.fc1(x_object)
+        x_place = self.fc2(x_place)
+        y = [x_object, x_place]
+        return y
