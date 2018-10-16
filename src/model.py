@@ -2,8 +2,6 @@ import torch
 import torch.nn.functional as F
 from torch.autograd import Variable
 
-# outconv = torch.nn.Conv2d(in_ch, out_ch, 1)
-
 class conv_bn(torch.nn.Module):
     def __init__(self, inp_ch, outp_ch):
         super(conv_bn, self).__init__()
@@ -48,6 +46,19 @@ class decode(torch.nn.Module):
             x = torch.cat([x2, x1], dim=1)
         return self.conv(x)
 
+class GramMatrix(nn.Module):
+    def forward(self, y):
+        # TODO - modify this
+        (b, ch, h, w) = y.size()
+        features = y.view(b, ch, w * h)
+        features_t = features.transpose(1, 2)
+        gram = features.bmm(features_t) / (ch * h * w)
+        return gram
+
+class Flatten(torch.nn.Module):
+    def forward(self, x):
+        return x.view(x.size()[0], -1)
+
 class TransformationNetwork(torch.nn.Module):
     def __init__(self, n_channels):
         super(TransformationNetwork, self).__init__()
@@ -73,10 +84,6 @@ class TransformationNetwork(torch.nn.Module):
         h = self.d3(h, h2)
         h = self.d4(h, h1)
         return self.outc(h)
-
-class Flatten(torch.nn.Module):
-    def forward(self, x):
-        return x.view(x.size()[0], -1)
 
 class SoundNet(torch.nn.Module):
     # KL Divergence Loss - Refer https://github.com/Kajiyu/Modern_SoundNet/blob/master/soundnet.ipynb 
@@ -111,3 +118,4 @@ class SoundNet(torch.nn.Module):
         x_place = self.fc2(x_place)
         y = [x_object, x_place]
         return y
+
