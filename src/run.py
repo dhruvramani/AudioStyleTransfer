@@ -6,6 +6,7 @@ import numpy as np
 import torch.nn.functional as F
 from torch.autograd import Variable
 import torch.backends.cudnn as cudnn
+import torchvision.models import models
 
 from model import *
 from utils import progress_bar
@@ -44,6 +45,8 @@ trainloader = torch.utils.data.DataLoader(vctk_set, batch_size=args.batch_size, 
 print('==> Building transformation network..')
 t_net = TransformationNetwork()
 t_net = t_net.to(device)
+l_net = models.vgg19() # Or try vgg19_bn()
+
 if device == 'cuda':
     t_net = torch.nn.DataParallel(t_net)
     cudnn.benchmark = True
@@ -60,14 +63,45 @@ if args.resume:
 # Define losses
 # content_loss = 
 # style_loss = 
+vgg_loss = torch.nn.CrossEntropyLoss()
 
-def train_transformation(epoch, curr_class, old_classes):
-    print('\nEpoch: %d' % epoch)
+def train_vgg(epoch):
+    print('\nTransformation Epoch: %d' % epoch)
+    l_net.train()
+    train_loss, correct, total = 0, 0, 0
+    params = l_net.parameters()
+    optimizer = optim.SGD(params, lr=args.lr, momentum=0.9, weight_decay=5e-4) # TODO : modify hyperparams
+    
+    for batch_idx, (inputs, targets) in enumerate(trainloader):
+        inputs, targets = inputs.to(device), targets.to(device)
+        optimizer.zero_grad()
+        y_pred = l_net(inputs)
+        loss = vgg_loss(y_pred, y_pred)
+        loss.backward()
+        optimizer.step()
+
+        train_loss += loss.item()
+        _, predicted = y_pred.max(1)
+        total += targets.size(0)
+        correct += predicted.eq(targets).sum().item()
+
+        with open("../save/logs/lossn_train_loss.log", "a+") as lfile:
+            lfile.write("{}\n".format(train_loss / total))
+
+        with open("../save/logs/lossn_train_acc", "a+") as afile:
+            afile.write("{}\n".format(correct / total))
+
+        progress_bar(batch_idx, len(trainloader), 'Loss: %.3f | Acc: %.3f%% (%d/%d)' % (train_loss / (batch_idx + 1), 100. * correct / total, correct, total))
+
+
+def train_transformation(epoch):
+    print('\nTransformation Epoch: %d' % epoch)
     t_net.train()
     
+    l_net = torch.load("../save/loss_model/vgg19.sav")
     train_loss, correct, total = 0, 0, 0
     params = t_net.parameters()
-    optimizer = optim.SGD(params, lr=args.lr, momentum=0.9, weight_decay=5e-4)
+    optimizer = optim.SGD(params, lr=args.lr, momentum=0.9, weight_decay=5e-4) # TODO : modify hyperparams
 
     for batch_idx, (inputs, targets) in enumerate(trainloader):
         inputs, targets = inputs.to(device), targets.to(device)
@@ -82,20 +116,20 @@ def train_transformation(epoch, curr_class, old_classes):
         '''
 
         train_loss += loss.item()
-        _, predicted = outputs.max(1)
+        _, predicted = y_pred.max(1)
         total += targets.size(0)
         correct += predicted.eq(targets).sum().item()
 
-        with open("../save/logs/train_loss.log", "a+") as lfile:
+        with open("../save/logs/transform_train_loss.log", "a+") as lfile:
             lfile.write("{}\n".format(train_loss / total))
 
-        with open("../save/logs/train_acc", "a+") as afile:
+        with open("../save/logs/transform_train_acc", "a+") as afile:
             afile.write("{}\n".format(correct / total))
 
-        progress_bar(batch_idx, len(trainloader), 'Loss: %.3f | Acc: %.3f%% (%d/%d)' % (train_loss/(batch_idx+1), 100.*correct/total, correct, total))
+        progress_bar(batch_idx, len(trainloader), 'Loss: %.3f | Acc: %.3f%% (%d/%d)' % (train_loss / (batch_idx + 1), 100. * correct / total, correct, total))
 
 
-def test(epoch, curr_class):
+def test(epoch):
     global best_acc
     net.eval()
     test_loss, correct, total = 0, 0, 0
@@ -135,5 +169,11 @@ def test(epoch, curr_class):
         best_acc = acc
 
 for epoch in range(start_epoch, start_epoch + 200):
-    train(epoch, i, old_classes_arr)
-    test(epoch, i)
+    train_vgg(epoch)
+    
+torch.save(l_net, "../save/loss_model/vgg19.sav")
+
+start_epoch = 0
+for epoch in range(start_epoch, start_epoch + 200):
+    train_transformation(epoch)
+    test(epoch)
