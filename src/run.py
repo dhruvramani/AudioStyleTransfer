@@ -111,7 +111,7 @@ def train_transformation(epoch):
 
     alpha, beta = 0.1, 0.1 # TODO : CHANGE hyperparams
     loss_fn = torch.nn.MSELoss(size_average=False)
-
+    gram = GramMatrix()
     style_image = None
 
     for batch_idx, (inputs, targets) in enumerate(trainloader):
@@ -130,13 +130,13 @@ def train_transformation(epoch):
             for param in st_activ.parameters():
                 param.requires_grad = False
 
-            y_s = st_activ(y_t)
-            style = st_activ(style_image)
+            y_s = gram(st_activ(y_t))
+            style = gram(st_activ(style_image))
 
             s_loss += loss_fn(style, y_s)
 
         loss = alpha * c_loss + beta * s_loss
-        
+
         for param in l_net.parameters():
             param.requires_grad = False
         
