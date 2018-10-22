@@ -6,7 +6,7 @@ import numpy as np
 import torch.nn.functional as F
 from torch.autograd import Variable
 import torch.backends.cudnn as cudnn
-import torchvision.models import models
+from vgg import vgg19
 
 from model import *
 from utils import progress_bar
@@ -45,7 +45,7 @@ trainloader = torch.utils.data.DataLoader(vctk_set, batch_size=args.batch_size, 
 print('==> Building transformation network..')
 t_net = TransformationNetwork()
 t_net = t_net.to(device)
-l_net = models.vgg19() # Or try vgg19_bn()
+l_net = vgg19() # Or try vgg19_bn()
 
 if device == 'cuda':
     t_net = torch.nn.DataParallel(t_net)
@@ -103,17 +103,45 @@ def train_transformation(epoch):
     params = t_net.parameters()
     optimizer = optim.SGD(params, lr=args.lr, momentum=0.9, weight_decay=5e-4) # TODO : modify hyperparams
 
+    l_list = *list(l_net.children())
+    conten_activ = torch.nn.Sequential(l_list[:-2]) # Might have to change later
+    
+    for param in conten_activ.parameters():
+        param.requires_grad = False
+
+    alpha, beta = 0.1, 0.1 # TODO : CHANGE hyperparams
+    loss_fn = torch.nn.MSELoss(size_average=False)
+
+    style_image = None
+
     for batch_idx, (inputs, targets) in enumerate(trainloader):
         inputs, targets = inputs.to(device), targets.to(device)
         optimizer.zero_grad()
-        y_pred = t_net(inputs)
+
+        y_t = t_net(inputs)
+
+        contnet = conten_activ(inputs)
+        y_c = conten_activ(y_t)
+        c_loss = loss_fn(y_c, content)
+
+        s_loss = 0
+        for st_i in range(2, len(l_list)):
+            st_activ = torch.nn.Sequential(l_list[:-i])
+            for param in st_activ.parameters():
+                param.requires_grad = False
+
+            y_s = st_activ(y_t)
+            style = st_activ(style_image)
+
+            s_loss += loss_fn(style, y_s)
+
+        loss = alpha * c_loss + beta * s_loss
         
-        ''' TODO 
-        - pass through loss network and calculate content & style loss
+        for param in l_net.parameters():
+            param.requires_grad = False
         
-        #content_loss.backward()
-        #optimizer.step()
-        '''
+        loss.backward()
+        optimizer.step()
 
         train_loss += loss.item()
         _, predicted = y_pred.max(1)
