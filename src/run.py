@@ -38,7 +38,7 @@ transform_test = transforms.Compose([
 ])
 '''
 
-vctk_set = torchaudio.datasets.VCTK('../data/', download=True) # NOTE @Anirban - see this!
+# vctk_set = torchaudio.datasets.VCTK('../data/', download=True) # NOTE @Anirban - see this!
 trainloader = torch.utils.data.DataLoader(vctk_set, batch_size=args.batch_size, shuffle=True, num_workers=2)
 # testloader 
 

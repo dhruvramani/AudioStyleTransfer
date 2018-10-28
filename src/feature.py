@@ -45,8 +45,8 @@ def power_spectral(filename, pathout):
     np.save(pathout, final)
     return final
 
+vctk_set = torchaudio.datasets.VCTK('../data/', download=True)
 filelist = glob.glob(os.path.join(args.in_folder, "*.txt"))
-
 for f in filelist:
     name_out = f.split("/")[-1]
     power_spectral(f, args.out_folder + "/" + name_out)
