@@ -13,7 +13,7 @@ from utils import progress_bar
 
 
 parser = argparse.ArgumentParser(description='PyTorch Audio Style Transfer')
-parser.add_argument('--lr', default=0.01, type=float, help='learning rate')
+parser.add_argument('--lr', default=0.01, type=float, help='learning rate') # NOTE change for diff models
 parser.add_argument('--batch_size', default=128, type=int)
 parser.add_argument('--resume', '-r', action='store_true', help='resume from checkpoint')
 args = parser.parse_args()
@@ -60,9 +60,6 @@ if args.resume:
     best_acc = checkpoint['acc']
     start_epoch = checkpoint['epoch']
 
-# Define losses
-# content_loss = 
-# style_loss = 
 vgg_loss = torch.nn.CrossEntropyLoss()
 
 def train_vgg(epoch):
@@ -125,7 +122,7 @@ def train_transformation(epoch):
         c_loss = loss_fn(y_c, content)
 
         s_loss = 0
-        for st_i in range(2, len(l_list)):
+        for st_i in range(2, len(l_list)): # NOTE : Change later
             st_activ = torch.nn.Sequential(l_list[:-i])
             for param in st_activ.parameters():
                 param.requires_grad = False
