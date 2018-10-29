@@ -98,7 +98,7 @@ def train_transformation(epoch):
     l_net = torch.load("../save/loss_model/vgg19.sav")
     train_loss, correct, total = 0, 0, 0
     params = t_net.parameters()
-    optimizer = optim.SGD(params, lr=args.lr, momentum=0.9, weight_decay=5e-4) # TODO : modify hyperparams
+    optimizer = optim.LBFGS(params, lr=args.lr) # TODO : modify hyperparams
 
     l_list = *list(l_net.children())
     conten_activ = torch.nn.Sequential(l_list[:-2]) # Might have to change later
