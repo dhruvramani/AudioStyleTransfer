@@ -6,7 +6,7 @@ import numpy as np
 import torch.nn.functional as F
 from torch.autograd import Variable
 import torch.backends.cudnn as cudnn
-from vgg import vgg19
+from resnet import resnet34
 
 from model import *
 from utils import progress_bar
@@ -16,6 +16,23 @@ parser = argparse.ArgumentParser(description='PyTorch Audio Style Transfer')
 parser.add_argument('--lr', default=0.01, type=float, help='learning rate') # NOTE change for diff models
 parser.add_argument('--batch_size', default=128, type=int)
 parser.add_argument('--resume', '-r', action='store_true', help='resume from checkpoint')
+parser.add_argument('--epochs', '-e', type=int, default=300, help='Number of epochs to train.')
+
+# Loss network trainer
+parser.add_argument('--loss_lr', type=float, default=0.1, help='The Learning Rate.')
+parser.add_argument('--momentum', '-lm', type=float, default=0.9, help='Momentum.')
+parser.add_argument('--decay', '-ld', type=float, default=5e-4, help='Weight decay (L2 penalty).')
+parser.add_argument('--test_bs', type=int, default=10)
+parser.add_argument('--schedule', type=int, nargs='+', default=[150, 225],
+                    help='Decrease learning rate at these epochs.')
+parser.add_argument('--gamma', type=float, default=0.1, help='LR is multiplied by gamma on schedule.')
+
+parser.add_argument('--depth', type=int, default=29, help='Model depth.')
+parser.add_argument('--cardinality', type=int, default=8, help='Model cardinality (group).')
+parser.add_argument('--base_width', type=int, default=64, help='Number of channels in each group.')
+parser.add_argument('--widen_factor', type=int, default=4, help='Widen factor. 4 -> 64, 8 -> 128, ...')
+
+
 args = parser.parse_args()
 
 device = 'cuda' if torch.cuda.is_available() else 'cpu'
@@ -45,7 +62,8 @@ trainloader = torch.utils.data.DataLoader(vctk_set, batch_size=args.batch_size, 
 print('==> Building transformation network..')
 t_net = TransformationNetwork()
 t_net = t_net.to(device)
-l_net = vgg19() # Or try vgg19_bn()
+l_net = resnet34() # Or try vgg19() / vgg19_bn()
+l_net = l_net.to(device)
 
 if device == 'cuda':
     t_net = torch.nn.DataParallel(t_net)
@@ -60,20 +78,21 @@ if args.resume:
     best_acc = checkpoint['acc']
     start_epoch = checkpoint['epoch']
 
-vgg_loss = torch.nn.CrossEntropyLoss()
+ce_loss = torch.nn.CrossEntropyLoss()
+loss_fn = torch.nn.MSELoss(size_average=False)
 
-def train_vgg(epoch):
-    print('\nTransformation Epoch: %d' % epoch)
+def train_lossn(epoch):
+    print('\Loss Epoch: {}'.format(epoch))
     l_net.train()
     train_loss, correct, total = 0, 0, 0
     params = l_net.parameters()
-    optimizer = optim.SGD(params, lr=args.lr, momentum=0.9, weight_decay=5e-4) # TODO : modify hyperparams
+    optimizer = optim.SGD(params, lr=args.lr, momentum=args.momentum, weight_decay=args.decay, nesterov=True) # TODO : modify hyperparams
     
     for batch_idx, (inputs, targets) in enumerate(trainloader):
         inputs, targets = inputs.to(device), targets.to(device)
         optimizer.zero_grad()
         y_pred = l_net(inputs)
-        loss = vgg_loss(y_pred, y_pred)
+        loss = ce_loss(y_pred, targets)
         loss.backward()
         optimizer.step()
 
@@ -92,7 +111,7 @@ def train_vgg(epoch):
 
 
 def train_transformation(epoch):
-    print('\nTransformation Epoch: %d' % epoch)
+    print('\nTransformation Epoch: {}'.format(epoch))
     t_net.train()
     
     l_net = torch.load("../save/loss_model/vgg19.sav")
@@ -107,7 +126,6 @@ def train_transformation(epoch):
         param.requires_grad = False
 
     alpha, beta = 0.1, 0.1 # TODO : CHANGE hyperparams
-    loss_fn = torch.nn.MSELoss(size_average=False)
     gram = GramMatrix()
     style_image = None
 
@@ -194,11 +212,11 @@ def test(epoch):
         best_acc = acc
 
 for epoch in range(start_epoch, start_epoch + 200):
-    train_vgg(epoch)
+    train_lossn(epoch)
     
 torch.save(l_net, "../save/loss_model/vgg19.sav")
 
 start_epoch = 0
-for epoch in range(start_epoch, start_epoch + 200):
+for epoch in range(start_epoch, start_epoch + args.epochs):
     train_transformation(epoch)
     test(epoch)
