@@ -8,6 +8,7 @@ def transform_stft(signal):
     D = librosa.stft(signal, n_fft=N_FFT)
     S, phase = librosa.magphase(D)
     S = np.log1p(S)
+    S = librosa.util.pad_center(S, 1700)
     return S
 
 def read_audio_spectrum(filename):
