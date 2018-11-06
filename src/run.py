@@ -9,6 +9,7 @@ import torch.backends.cudnn as cudnn
 from resnet import resnet34
 
 from model import *
+from models.conv_autoencoder import *
 from utils import progress_bar
 
 
