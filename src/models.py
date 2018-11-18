@@ -60,7 +60,7 @@ class Flatten(torch.nn.Module):
         return x.view(x.size()[0], -1)
 
 class TransformationNetwork(torch.nn.Module):
-    def __init__(self, n_channels):
+    def __init__(self, n_channels=1):
         super(TransformationNetwork, self).__init__()
         self.inc = conv_bn(n_channels, 64)
         self.e1 = encode(64, 128)
