@@ -3,10 +3,10 @@ import os
 import numpy as np
 import glob
 
-N_FFT = 2048
+N_FFT = 256
 
 def transform_stft(signal):
-    D = librosa.stft(signal, n_fft=N_FFT)
+    D = librosa.stft(signal, n_fft=N_FFT, win_length=150, hop_length=50)
     S, phase = librosa.magphase(D)
     S = np.log1p(S)
     return S
