@@ -3,6 +3,9 @@ __pycache__/
 *.py[cod]
 *$py.class
 
+save/
+misc/Autoencoder/models/
+misc/Autoencoder/Features
 # C extensions
 *.so
 
