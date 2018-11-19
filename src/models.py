@@ -119,3 +119,43 @@ class SoundNet(torch.nn.Module):
         y = [x_object, x_place]
         return y
 
+class Encoder(nn.Module):
+    def __init__(self):
+        super(Encoder, self).__init__()
+        self.encoder = nn.Sequential(
+            nn.Conv2d(1, 225, 5, dilation=1),  # b, 16, 10, 10
+            nn.ReLU(True),
+            nn.BatchNorm2d(225),
+            nn.Conv2d(225, 256, 5, stride=2),  # b, 8, 3, 3
+            nn.ReLU(True),
+            nn.BatchNorm2d(256),
+            nn.Conv2d(256, 256, 3, stride=2),   # b, 8, 2, 2
+            nn.ReLU(True),
+            nn.BatchNorm2d(256),
+            nn.Conv2d(256, 100, 3, stride=1),   # b, 8, 2, 2
+            nn.ReLU(True),
+            nn.BatchNorm2d(100)
+        )
+    def forward(self, x):
+        x = self.encoder(x)
+        return x
+
+class Decoder(nn.Module):
+    def __init__(self):
+        super(Decoder, self).__init__()
+        self.decoder = nn.Sequential(
+            nn.ConvTranspose2d(100, 256, 3, stride=2),  # b, 16, 5, 5
+            nn.ReLU(True),
+            nn.BatchNorm2d(256),
+            nn.ConvTranspose2d(256, 256, 5, stride=2),  # b, 16, 5, 5
+            nn.ReLU(True),
+            nn.BatchNorm2d(256),
+            nn.ConvTranspose2d(256, 256, 11, stride=1),  # b, 16, 5, 5
+            nn.ReLU(True),
+            nn.BatchNorm2d(256),
+            nn.Conv2d(256, 1, 1, stride=1, padding=1)
+        )
+
+    def forward(self, x):
+        x = self.decoder(x)
+        return x

@@ -10,7 +10,7 @@ def transform_stft(signal):
     S = np.log1p(S)
     S = librosa.util.pad_center(S, 1700)
     return S
-    ##changed on 17th nov
+
 def transform_stft_new(signal):
     D = librosa.stft(signal, n_fft=N_FFT)
     S, phase = librosa.magphase(D)
@@ -18,7 +18,7 @@ def transform_stft_new(signal):
     S = np.log1p(S)
     S = librosa.util.pad_center(S, 2500)
     return S
-    ##
+
 def read_audio_spectrum(filename):
     signal, fs = librosa.load(filename)
     S = librosa.stft(signal, N_FFT)

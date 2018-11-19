@@ -1,11 +1,9 @@
 __author__ = 'SherlockLiao'
 
 import torch
-import torchvision
 from torch import nn
 from torch.autograd import Variable
 from torch.utils.data import DataLoader
-#from torchvision import transforms
 from torchvision.utils import save_image
 from feature import transform_stft
 from feature import transform_stft_new
@@ -40,12 +38,12 @@ img_transform = transforms.Compose([
 
 def collate_fn(data):
     data = list(filter(lambda x: type(x[1]) != int, data))
-    images, captions = zip(*data)
+    audios, captions = zip(*data)
     data = None
     del data
-    images = torch.stack(images, 0)
+    audios = torch.stack(audios, 0)
 
-    return images, captions
+    return audios, captions
 
 
 def inp_transform(inp):
@@ -117,36 +115,22 @@ if(os.path.isfile("./models/info.txt")):
 
 for epoch in range(sepoch, num_epochs):
     for i in range(step, len(dataloader)):
-        (images, captions) = next(dataloader)
-        if(type(images) == int):
+        (audios, captions) = next(dataloader)
+        if(type(audios) == int):
             print("continued")
             continue
         # Set mini-batch dataset
         del captions
-        images = (images[:, :, :, 0:500].to(device), images[:, :, :, 500:1000].to(device))
-        # ===================forward=====================
-        latent_space = encoder(images[0])
-        output = decoder(latent_space)
-        #output = output.view(-1, list(images.shape))
-        optimizer.zero_grad()
-        loss = criterion(output, images[0][:, :, :, :-3])
-        # ===================backward====================
-        loss.backward()
-        optimizer.step()
+        audios = (audios[:, :, :, 0:500].to(device), audios[:, :, :, 500:1000].to(device))
+        for audio in audios:
+            latent_space = encoder(audio)
+            output = decoder(latent_space)
+            optimizer.zero_grad()
+            loss = criterion(output, audio[:, :, :, :-3])
+            loss.backward()
+            optimizer.step()
 
-        #output = output.to(torch.device('cpu'))
-        #images1 = images1.to(torch.device('cpu'))
-        #images1 = 
-        # ===================forward=====================
-        latent_space = encoder(images[1])
-        output = decoder(latent_space)
-        #output = output.view(-1, list(images.shape))
-        optimizer.zero_grad()
-        loss = criterion(output, images[1][:, :, :, :-3])
-        # ===================backward====================
-        loss.backward()
-        optimizer.step()
-        del images
+        del audios
         print('epoch [{}/{}], step[{}/{}], loss:{:.4f}'.format(epoch+1, num_epochs, i, len(dataloader), loss.item()), end="\r")
 
         if i%25==0:
@@ -166,5 +150,5 @@ for epoch in range(sepoch, num_epochs):
 
     #if epoch % 1 == 0:
         #pic = to_img(output.cpu().data)
-        #save_image(pic, './dc_img/image_{}.png'.format(epoch))
+        #save_audio(pic, './dc_img/audio_{}.png'.format(epoch))
 
