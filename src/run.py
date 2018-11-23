@@ -18,7 +18,7 @@ from utils import progress_bar
 parser = argparse.ArgumentParser(description='PyTorch Audio Style Transfer')
 parser.add_argument('--lr', default=0.001, type=float, help='learning rate') # NOTE change for diff models
 parser.add_argument('--batch_size', default=24, type=int)
-parser.add_argument('--resume', '-r', type=int, default=0, help='resume from checkpoint')
+parser.add_argument('--resume', '-r', type=int, default=1, help='resume from checkpoint')
 parser.add_argument('--epochs', '-e', type=int, default=300, help='Number of epochs to train.')
 
 # Loss network trainer
@@ -53,10 +53,6 @@ def inp_transform(inp):
     inp = inp.unsqueeze(0)
     return inp
 
-vdataset = VCTK('/home/nevronas/dataset/', download=False, transform=inp_transform)
-dataloader = DataLoader(vdataset, batch_size=args.batch_size, shuffle=True,  collate_fn=collate_fn)
-dataloader = iter(dataloader)
-
 print('==> Creating networks..')
 t_net = TransformationNetwork()
 t_net = t_net.to(device)
@@ -86,6 +82,11 @@ if(args.resume):
 
 def train_lossn(epoch):
     global lstep
+
+    vdataset = VCTK('/home/nevronas/dataset/', download=False, transform=inp_transform)
+    dataloader = DataLoader(vdataset, batch_size=args.batch_size, shuffle=True,  collate_fn=collate_fn)
+    dataloader = iter(dataloader)
+
     print('\n=> Loss Epoch: {}'.format(epoch))
     train_loss, total = 0, 0
     params = list(encoder.parameters()) + list(decoder.parameters())
@@ -133,6 +134,10 @@ def train_transformation(epoch):
     print('\n=> Transformation Epoch: {}'.format(epoch))
     t_net.train()
     
+    vdataset = VCTK('/home/nevronas/dataset/', download=False, transform=inp_transform)
+    dataloader = DataLoader(vdataset, batch_size=args.batch_size, shuffle=True,  collate_fn=collate_fn)
+    dataloader = iter(dataloader)
+
     train_loss = 0
     params = t_net.parameters()
     optimizer = torch.optim.Adam(params, lr=args.lr) 
@@ -143,7 +148,7 @@ def train_transformation(epoch):
     for param in conten_activ.parameters():
         param.requires_grad = False
 
-    alpha, beta = 7.5, 100 # TODO : CHANGE hyperparams
+    alpha, beta = 7.5, 50 # TODO : CHANGE hyperparams
     gram = GramMatrix()
     style_audio = None # TODO : get style audio
 
