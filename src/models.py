@@ -1,52 +1,94 @@
 import torch
+import torch.nn as nn
 import torch.nn.functional as F
 from torch.autograd import Variable
 
-class conv_bn(torch.nn.Module):
-    def __init__(self, inp_ch, outp_ch):
-        super(conv_bn, self).__init__()
-        self.conv = torch.nn.Sequential(
-                torch.nn.Conv2d(inp_ch, outp_ch, 3),
-                torch.nn.BatchNorm2d(outp_ch),
-                torch.nn.ReLU(inplace=True)
-            )
 
-    def forward(self, x):
-        return self.conv(x)
-
-class encode(torch.nn.Module):
-    def __init__(self, inp_ch, outp_ch):
-        super(encode, self).__init__()
-        self.mpconv = torch.nn.Sequential(
-            torch.nn.MaxPool2d(2),
-            conv_bn(inp_ch, outp_ch)
+class double_conv(nn.Module):
+    '''(conv => BN => ReLU) * 2'''
+    def __init__(self, in_ch, out_ch):
+        super(double_conv, self).__init__()
+        self.conv = nn.Sequential(
+            nn.Conv2d(in_ch, out_ch, 3, padding=1),
+            nn.BatchNorm2d(out_ch),
+            nn.ReLU(inplace=True),
+            nn.Conv2d(out_ch, out_ch, 3, padding=1),
+            nn.BatchNorm2d(out_ch),
+            nn.ReLU(inplace=True)
         )
 
     def forward(self, x):
-        return self.mpconv(x)
+        x = self.conv(x)
+        return x
 
-# Unet based, can change
-class decode(torch.nn.Module):
-    def __init__(self, inp_ch, outp_ch, bilinear=False):
-        super(decode, self).__init__()
+
+class inconv(nn.Module):
+    def __init__(self, in_ch, out_ch):
+        super(inconv, self).__init__()
+        self.conv = double_conv(in_ch, out_ch)
+
+    def forward(self, x):
+        x = self.conv(x)
+        return x
+
+
+class down(nn.Module):
+    def __init__(self, in_ch, out_ch):
+        super(down, self).__init__()
+        self.mpconv = nn.Sequential(
+            nn.MaxPool2d(2),
+            double_conv(in_ch, out_ch)
+        )
+
+    def forward(self, x):
+        x = self.mpconv(x)
+        return x
+
+
+class up(nn.Module):
+    def __init__(self, in_ch, out_ch, bilinear=False):
+        super(up, self).__init__()
+
+        #  would be a nice idea if the upsampling could be learned too,
+        #  but my machine do not have enough memory to handle all those weights
         if bilinear:
-            self.up = torch.nn.Upsample(scale_factor=2, mode='bilinear', align_corners=True)
+            self.up = nn.Upsample(scale_factor=2, mode='bilinear', align_corners=True)
         else:
-            self.up = torch.nn.ConvTranspose2d(inp_ch//2, inp_ch//2, 2, stride=2)
-        self.conv = conv_bn(inp_ch, outp_ch)
+            self.up = nn.ConvTranspose2d(in_ch//2, in_ch//2, 2, stride=2)
 
-    def forward(self, x1, x2=None):
+        self.conv = double_conv(in_ch, out_ch)
+
+    def forward(self, x1, x2):
         x1 = self.up(x1)
-        x = x1
-        if(x2):
-            diffX = x1.size()[2] - x2.size()[2]
-            diffY = x1.size()[3] - x2.size()[3]
-            x2 = F.pad(x2, (diffX // 2, int(diffX / 2),
-                        diffY // 2, int(diffY / 2)))
-            x = torch.cat([x2, x1], dim=1)
-        return self.conv(x)
+        
+        # input is CHW
+        diffY = x2.size()[2] - x1.size()[2]
+        diffX = x2.size()[3] - x1.size()[3]
 
-class GramMatrix(nn.Module):
+        x1 = F.pad(x1, (diffX // 2, diffX - diffX//2,
+                        diffY // 2, diffY - diffY//2))
+        
+        # for padding issues, see 
+        # https://github.com/HaiyongJiang/U-Net-Pytorch-Unstructured-Buggy/commit/0e854509c2cea854e247a9c615f175f76fbb2e3a
+        # https://github.com/xiaopeng-liao/Pytorch-UNet/commit/8ebac70e633bac59fc22bb5195e513d5832fb3bd
+
+        x = torch.cat([x2, x1], dim=1)
+        x = self.conv(x)
+        return x
+
+
+class outconv(nn.Module):
+    def __init__(self, in_ch, out_ch):
+        super(outconv, self).__init__()
+        self.conv = nn.Conv2d(in_ch, out_ch, 1)
+
+    def forward(self, x):
+        x = self.conv(x)
+        return x
+
+
+
+class GramMatrix(torch.nn.Module):
     def forward(self, y):
         # TODO - modify this
         (b, ch, h, w) = y.size()
@@ -62,15 +104,14 @@ class Flatten(torch.nn.Module):
 class TransformationNetwork(torch.nn.Module):
     def __init__(self, n_channels=1):
         super(TransformationNetwork, self).__init__()
-        self.inc = conv_bn(n_channels, 64)
-        self.e1 = encode(64, 128)
-        self.e2 = encode(128, 256)
-        self.e3 = encode(256, 512)
-        self.e4 = encode(512, 512)
-        self.d1 = decode(1024, 256)
-        self.d2 = decode(512, 128)
-        self.d3 = decode(256, 64)
-        self.d4 = decode(128, 64)
+        self.inc = inconv(n_channels, 64)
+        self.e1 = down(64, 128)
+        self.e2 = down(128, 256)
+        self.e3 = down(256, 256)
+
+        self.d2 = up(512, 128)
+        self.d3 = up(256, 64)
+        self.d4 = up(128, 64)
         self.outc = torch.nn.Conv2d(64, n_channels, 1)
 
     def forward(self, x):
@@ -78,9 +119,8 @@ class TransformationNetwork(torch.nn.Module):
         h2 = self.e1(h1)
         h3 = self.e2(h2)
         h4 = self.e3(h3)
-        h5 = self.e4(h4)
-        h = self.d1(h5, h4)
-        h = self.d2(h, h3)
+
+        h = self.d2(h4, h3)
         h = self.d3(h, h2)
         h = self.d4(h, h1)
         return self.outc(h)
@@ -119,7 +159,7 @@ class SoundNet(torch.nn.Module):
         y = [x_object, x_place]
         return y
 
-class Encoder(nn.Module):
+class Encoder(torch.nn.Module):
     def __init__(self):
         super(Encoder, self).__init__()
         self.encoder = nn.Sequential(
@@ -140,7 +180,7 @@ class Encoder(nn.Module):
         x = self.encoder(x)
         return x
 
-class Decoder(nn.Module):
+class Decoder(torch.nn.Module):
     def __init__(self):
         super(Decoder, self).__init__()
         self.decoder = nn.Sequential(
