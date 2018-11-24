@@ -95,6 +95,7 @@ class GramMatrix(torch.nn.Module):
         features = y.view(b, ch, w * h)
         features_t = features.transpose(1, 2)
         gram = features.bmm(features_t) / (ch * h * w)
+        #gram = features.bmm(features_t)
         return gram
 
 class Flatten(torch.nn.Module):

@@ -17,7 +17,7 @@ from utils import progress_bar
 
 parser = argparse.ArgumentParser(description='PyTorch Audio Style Transfer')
 parser.add_argument('--lr', default=0.001, type=float, help='learning rate') # NOTE change for diff models
-parser.add_argument('--batch_size', default=24, type=int)
+parser.add_argument('--batch_size', default=20, type=int)
 parser.add_argument('--resume', '-r', type=int, default=1, help='resume from checkpoint')
 parser.add_argument('--epochs', '-e', type=int, default=300, help='Number of epochs to train.')
 
@@ -80,9 +80,21 @@ if(args.resume):
             tsepoch, tstep = (int(i) for i in str(f.read()).split(" "))
         print("=> Transformation network : prev epoch found")
 
+def get_style(path='../save/style/style_lady.wav'):
+    N_FFT = 128
+    signal, fs = librosa.load(path)
+    del fs
+    signal = librosa.stft(signal, n_fft=N_FFT)
+    signal, phase = librosa.magphase(signal)
+    del phase
+    signal = np.log1p(signal)
+    signal = signal[ :, 1000:1500]
+    signal = torch.from_numpy(signal) # TODO : get style audio
+    signal = signal.unsqueeze(0)
+    return signal
+
 def train_lossn(epoch):
     global lstep
-
     vdataset = VCTK('/home/nevronas/dataset/', download=False, transform=inp_transform)
     dataloader = DataLoader(vdataset, batch_size=args.batch_size, shuffle=True,  collate_fn=collate_fn)
     dataloader = iter(dataloader)
@@ -127,6 +139,8 @@ def train_lossn(epoch):
         progress_bar(i, len(dataloader), 'Loss: %.3f' % (train_loss / (i - lstep + 1)))
 
     lstep = 0
+    del dataloader
+    del vdataset
     print('=> Loss Network : Epoch [{}/{}], Loss:{:.4f}'.format(epoch + 1, 5, train_loss / len(data_loader)))
 
 def train_transformation(epoch):
@@ -139,18 +153,28 @@ def train_transformation(epoch):
     dataloader = iter(dataloader)
 
     train_loss = 0
+    tr_con = 0
+    tr_sty = 0
     params = t_net.parameters()
     optimizer = torch.optim.Adam(params, lr=args.lr) 
 
     l_list = list(encoder.children())
-    conten_activ = torch.nn.Sequential(*list(l_list[:-1])) # Not having batchnorm 
+    l_list = list(l_list[0].children())
+    conten_activ = torch.nn.Sequential(*l_list[:-1]) # Not having batchnorm 
     
     for param in conten_activ.parameters():
         param.requires_grad = False
 
-    alpha, beta = 7.5, 50 # TODO : CHANGE hyperparams
+    alpha, beta = 1.0, 100.0 # TODO : CHANGE hyperparams
     gram = GramMatrix()
-    style_audio = None # TODO : get style audio
+
+    style_audio = get_style()
+
+    sty_aud = []
+    for k in range(args.batch_size): # No. of style audio == batch_size
+        sty_aud.append(style_audio)
+
+    sty_aud = torch.stack(sty_aud).to(device)
 
     for i in range(tstep, len(dataloader)):
         (audios, captions) = next(dataloader)
@@ -161,7 +185,6 @@ def train_transformation(epoch):
         audios = (audios[:, :, :, 0:500].to(device), audios[:, :, :, 500:1000].to(device))
         for audio in audios : # LOL - splitting coz GPU
             optimizer.zero_grad()
-
             y_t = t_net(audio)
 
             content = conten_activ(audio)
@@ -169,27 +192,30 @@ def train_transformation(epoch):
             c_loss = loss_fn(y_c, content)
 
             s_loss = 0
-            
+
             for st_i in range(5, len(l_list), 3): # NOTE : gets relu of 1, 2, 3
-                st_activ = torch.nn.Sequential(l_list[:-i])
+                st_activ = torch.nn.Sequential(*l_list[:-i])
+                
                 for param in st_activ.parameters():
                     param.requires_grad = False
-
                 y_s = gram(st_activ(y_t))
-                style = gram(st_activ(style_audio))
+                style = gram(st_activ(sty_aud))
 
-                s_loss += loss_fn(style, y_s)
-        
+                s_loss += loss_fn(y_s, style)
+
             loss = alpha * c_loss + beta * s_loss
 
+            train_loss = loss.item()
+            tr_con = c_loss.item()
+            tr_sty = s_loss.item()
             for param in encoder.parameters():
                 param.requires_grad = False
         
             loss.backward()
             optimizer.step()
+            del sty_aud
 
         del audios
-        train_loss = loss.item()
 
         gc.collect()
         torch.cuda.empty_cache()
@@ -201,9 +227,11 @@ def train_transformation(epoch):
         with open("../save/transform/logs/transform_train_loss.log", "a+") as lfile:
             lfile.write("{}\n".format(train_loss))
 
-        progress_bar(i, len(dataloader), 'Loss: %.3f ' % (train_loss))
+        progress_bar(i, len(dataloader), 'Loss: %.3f, Con Loss: %.3f, Sty Loss: %.3f ' % (train_loss, tr_con, tr_sty))
 
     tstep = 0
+    del dataloader
+    del vdataset
     print('=> Transformation Network : Epoch [{}/{}], Loss:{:.4f}'.format(epoch + 1, args.epochs, train_loss))
 
 
