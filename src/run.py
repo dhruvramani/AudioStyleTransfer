@@ -17,7 +17,7 @@ from utils import progress_bar
 
 parser = argparse.ArgumentParser(description='PyTorch Audio Style Transfer')
 parser.add_argument('--lr', default=0.001, type=float, help='learning rate') # NOTE change for diff models
-parser.add_argument('--batch_size', default=20, type=int)
+parser.add_argument('--batch_size', default=25, type=int)
 parser.add_argument('--resume', '-r', type=int, default=1, help='resume from checkpoint')
 parser.add_argument('--epochs', '-e', type=int, default=300, help='Number of epochs to train.')
 
@@ -54,7 +54,7 @@ def inp_transform(inp):
     return inp
 
 print('==> Creating networks..')
-t_net = TransformationNetwork()
+t_net = Transformation()
 t_net = t_net.to(device)
 encoder = Encoder().to(device)
 decoder = Decoder().to(device)
@@ -155,13 +155,14 @@ def train_transformation(epoch):
     train_loss = 0
     tr_con = 0
     tr_sty = 0
+    tr_mse = 0
     params = t_net.parameters()
     optimizer = torch.optim.Adam(params, lr=args.lr) 
 
     l_list = list(encoder.children())
     l_list = list(l_list[0].children())
-    conten_activ = torch.nn.Sequential(*l_list[:-1]) # Not having batchnorm 
-    
+    conten_activ = torch.nn.Sequential(*l_list[:-1]) # Not having batchnorm
+
     for param in conten_activ.parameters():
         param.requires_grad = False
 
@@ -169,12 +170,6 @@ def train_transformation(epoch):
     gram = GramMatrix()
 
     style_audio = get_style()
-
-    sty_aud = []
-    for k in range(args.batch_size): # No. of style audio == batch_size
-        sty_aud.append(style_audio)
-
-    sty_aud = torch.stack(sty_aud).to(device)
 
     for i in range(tstep, len(dataloader)):
         (audios, captions) = next(dataloader)
@@ -189,31 +184,36 @@ def train_transformation(epoch):
 
             content = conten_activ(audio)
             y_c = conten_activ(y_t)
+
             c_loss = loss_fn(y_c, content)
 
             s_loss = 0
+            sty_aud = []
+            for k in range(audio.size()[0]): # No. of style audio == batch_size
+                sty_aud.append(style_audio)
+            sty_aud = torch.stack(sty_aud).to(device)
 
-            for st_i in range(5, len(l_list), 3): # NOTE : gets relu of 1, 2, 3
-                st_activ = torch.nn.Sequential(*l_list[:-i])
-                
+            for st_i in range(2, len(l_list)-2, 3): # NOTE : gets relu of 1, 2, 3
+                st_activ = torch.nn.Sequential(*l_list[:st_i])
                 for param in st_activ.parameters():
                     param.requires_grad = False
                 y_s = gram(st_activ(y_t))
                 style = gram(st_activ(sty_aud))
-
+		
                 s_loss += loss_fn(y_s, style)
-
-            loss = alpha * c_loss + beta * s_loss
+            
+            del sty_aud	
+            loss = alpha * c_loss + beta * s_loss 
 
             train_loss = loss.item()
             tr_con = c_loss.item()
             tr_sty = s_loss.item()
+            
             for param in encoder.parameters():
                 param.requires_grad = False
         
             loss.backward()
             optimizer.step()
-            del sty_aud
 
         del audios
 
@@ -227,7 +227,7 @@ def train_transformation(epoch):
         with open("../save/transform/logs/transform_train_loss.log", "a+") as lfile:
             lfile.write("{}\n".format(train_loss))
 
-        progress_bar(i, len(dataloader), 'Loss: %.3f, Con Loss: %.3f, Sty Loss: %.3f ' % (train_loss, tr_con, tr_sty))
+        progress_bar(i, len(dataloader), 'Loss: {}, Con Loss: {}, Sty Loss: {} '.format(train_loss, tr_con, tr_sty))
 
     tstep = 0
     del dataloader
