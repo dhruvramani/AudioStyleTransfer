@@ -17,9 +17,9 @@ from utils import progress_bar
 
 parser = argparse.ArgumentParser(description='PyTorch Audio Style Transfer')
 parser.add_argument('--lr', default=0.001, type=float, help='learning rate') # NOTE change for diff models
-parser.add_argument('--batch_size', default=25, type=int)
-parser.add_argument('--resume', '-r', type=int, default=1, help='resume from checkpoint')
-parser.add_argument('--epochs', '-e', type=int, default=300, help='Number of epochs to train.')
+parser.add_argument('--batch_size', default=12, type=int)
+parser.add_argument('--resume', '-r', type=int, default=0, help='resume from checkpoint')
+parser.add_argument('--epochs', '-e', type=int, default=2, help='Number of epochs to train.')
 
 # Loss network trainer
 parser.add_argument('--lresume', type=int, default=1, help='resume loss from checkpoint')
@@ -88,7 +88,7 @@ def get_style(path='../save/style/style_lady.wav'):
     signal, phase = librosa.magphase(signal)
     del phase
     signal = np.log1p(signal)
-    signal = signal[ :, 1000:1500]
+    signal = signal[ :, 1200:1500]
     signal = torch.from_numpy(signal) # TODO : get style audio
     signal = signal.unsqueeze(0)
     return signal
@@ -172,12 +172,15 @@ def train_transformation(epoch):
     style_audio = get_style()
 
     for i in range(tstep, len(dataloader)):
-        (audios, captions) = next(dataloader)
+        try :
+            (audios, captions) = next(dataloader)
+        except ValueError:
+            break
         if(type(audios) == int):
             print("=> Transformation Network : Chucked Sample")
             continue
 
-        audios = (audios[:, :, :, 0:500].to(device), audios[:, :, :, 500:1000].to(device))
+        audios = (audios[:, :, :, 0:300].to(device), audios[:, :, :, 300:600].to(device), audios[:, :, :, 600:900].to(device))
         for audio in audios : # LOL - splitting coz GPU
             optimizer.zero_grad()
             y_t = t_net(audio)
