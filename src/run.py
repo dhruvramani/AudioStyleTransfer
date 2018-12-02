@@ -17,7 +17,7 @@ from utils import progress_bar
 
 parser = argparse.ArgumentParser(description='PyTorch Audio Style Transfer')
 parser.add_argument('--lr', default=0.001, type=float, help='learning rate') # NOTE change for diff models
-parser.add_argument('--batch_size', default=12, type=int)
+parser.add_argument('--batch_size', default=25, type=int)
 parser.add_argument('--resume', '-r', type=int, default=0, help='resume from checkpoint')
 parser.add_argument('--epochs', '-e', type=int, default=2, help='Number of epochs to train.')
 
@@ -36,6 +36,10 @@ best_acc, tsepoch, tstep, lsepoch, lstep = 0, 0, 0, 0, 0
 loss_fn = torch.nn.MSELoss(size_average=False)
 
 print('==> Preparing data..')
+
+# To get logs of current run only
+with open("../save/transform/logs/transform_train_loss.log", "w+") as f:
+    pass 
 
 def collate_fn(data):
     data = list(filter(lambda x: type(x[1]) != int, data))
@@ -156,7 +160,18 @@ def train_transformation(epoch):
     tr_con = 0
     tr_sty = 0
     tr_mse = 0
-    params = t_net.parameters()
+
+
+    # NOTE : Experimental, change
+    params = [] #t_net.parameters()
+    ct = 0
+    for child in t_net.children():
+        ct += 1
+        if ct < 7:
+            print(child)
+            params += list(child.parameters())
+
+    
     optimizer = torch.optim.Adam(params, lr=args.lr) 
 
     l_list = list(encoder.children())
@@ -166,7 +181,7 @@ def train_transformation(epoch):
     for param in conten_activ.parameters():
         param.requires_grad = False
 
-    alpha, beta = 1.0, 100.0 # TODO : CHANGE hyperparams
+    alpha, beta = 10.0, 75.0 # TODO : CHANGE hyperparams
     gram = GramMatrix()
 
     style_audio = get_style()
