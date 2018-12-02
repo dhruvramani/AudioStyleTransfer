@@ -165,10 +165,9 @@ def train_transformation(epoch):
     # NOTE : Experimental, change
     params = [] #t_net.parameters()
     ct = 0
-    for child in t_net.children():
+    for child in t_net.enc.encoder.children():
         ct += 1
         if ct < 7:
-            print(child)
             params += list(child.parameters())
 
     
