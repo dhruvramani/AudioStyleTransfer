@@ -16,8 +16,8 @@ from torch.utils.data import DataLoader
 device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 
 def load_audio(audio_path):
-    signal, _ = librosa.load(audio_path)
-    return signal
+    signal, fs = librosa.load(audio_path)
+    return signal, fs
 
 def collate_fn(data):
     data = list(filter(lambda x: type(x[1]) != int, data))
@@ -46,7 +46,9 @@ def main():
     vdataset = VCTK('/home/nevronas/dataset/', download=False)
     dataloader = DataLoader(vdataset, batch_size=1)
 
-    audio, targets = next(iter(dataloader))
+    audio, _ = next(iter(dataloader))
+    _, fs = load_audio('/home/nevronas/dataset/vctk/raw/p225_308.wav')
+    #audio = torch.Tensor(audio)
     audio = inp_transform(audio)
     audio = audio.to(device)
     out = trans_net(audio)
@@ -54,6 +56,7 @@ def main():
     audio = audio[0].cpu().numpy()
     matplotlib.image.imsave('../save/plots/input/audio.png', audio[0])
     matplotlib.image.imsave('../save/plots/output/stylized_audio.png', out[0])
+    #invert_spectrogram(out[0], audio[0], fs, '../save/plots/output/raw_audio.wav')
 
     #matplotlib.image.imsave('out.png', out[0])
 

@@ -20,6 +20,19 @@ def transform_stft_new(signal):
     S = librosa.util.pad_center(S, 2500)
     return S
 
+def invert_spectrogram(result, a_content, fs, outpath):
+    a = np.zeros_like(a_content)
+    a[:a_content.shape[0],:] = np.exp(result[0,0].T) - 1
+    p = 2 * np.pi * np.random.random_sample(a.shape) - np.pi
+    x = 0
+
+    for i in range(500):
+        S = a * np.exp(1j*p)
+        x = librosa.istft(S)
+        p = np.angle(librosa.stft(x, N_FFT))
+
+    librosa.output.write_wav(outpath, x, fs)
+
 def read_audio_spectrum(filename):
     signal, fs = librosa.load(filename)
     S = librosa.stft(signal, N_FFT)
