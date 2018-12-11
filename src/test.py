@@ -31,11 +31,11 @@ def inp_transform(inp):
     inp = inp.numpy()
     inp = inp.astype(np.float32)
     inp = inp.flatten()
-    inp = transform_stft(inp, pad=False)
+    inp, phase = transform_stft(inp, pad=False)
     inp = torch.Tensor(inp)
     inp = inp.unsqueeze(0)
     inp = inp.unsqueeze(0)
-    return inp
+    return inp, phase
 
 def main():
 
@@ -46,17 +46,21 @@ def main():
     vdataset = VCTK('/home/nevronas/dataset/', download=False)
     dataloader = DataLoader(vdataset, batch_size=1)
 
-    audio, _ = next(iter(dataloader))
-    _, fs = load_audio('/home/nevronas/dataset/vctk/raw/p225_308.wav')
-    #audio = torch.Tensor(audio)
-    audio = inp_transform(audio)
+    #audio, _ = next(iter(dataloader))
+    audio, fs = load_audio('/home/nevronas/dataset/vctk/raw/p225_308.wav')
+    audio = torch.Tensor(audio)
+    audio, phase = inp_transform(audio)
     audio = audio.to(device)
     out = trans_net(audio)
     out = out[0].detach().cpu().numpy()
     audio = audio[0].cpu().numpy()
     matplotlib.image.imsave('../save/plots/input/audio.png', audio[0])
     matplotlib.image.imsave('../save/plots/output/stylized_audio.png', out[0])
-    #invert_spectrogram(out[0], audio[0], fs, '../save/plots/output/raw_audio.wav')
+    aud_res = reconstruction(audio[0], phase)
+    out_res = reconstruction(out[0], phase[:, :-3])
+    librosa.output.write_wav("../save/plots/input/raw_audio.wav", aud_res, fs)
+    librosa.output.write_wav("../save/plots/output/raw_output.wav", out_res, fs)
+    #invert_spectrogram(audio[0], audio[0], fs, '../save/plots/output/raw_audio.wav')
 
     #matplotlib.image.imsave('out.png', out[0])
 

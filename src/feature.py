@@ -10,7 +10,7 @@ def transform_stft(signal, pad=True):
     S = np.log1p(S)
     if(pad):
         S = librosa.util.pad_center(S, 1700)
-    return S
+    return S, phase
 
 def transform_stft_new(signal):
     D = librosa.stft(signal, n_fft=N_FFT)
@@ -20,7 +20,13 @@ def transform_stft_new(signal):
     S = librosa.util.pad_center(S, 2500)
     return S
 
-def invert_spectrogram(result, a_content, fs, outpath):
+def reconstruction(S, phase):
+    exp = np.expm1(S)
+    comple = exp * np.exp(phase)
+    istft = librosa.istft(comple)
+    return istft 
+
+def invert_spectrogram(result, a_content, outpath, fs=48000):
     a = np.zeros_like(a_content)
     a[:a_content.shape[0],:] = np.exp(result[0,0].T) - 1
     p = 2 * np.pi * np.random.random_sample(a.shape) - np.pi

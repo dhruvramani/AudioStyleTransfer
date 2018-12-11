@@ -16,10 +16,10 @@ from utils import progress_bar
 
 
 parser = argparse.ArgumentParser(description='PyTorch Audio Style Transfer')
-parser.add_argument('--lr', default=0.001, type=float, help='learning rate') # NOTE change for diff models
+parser.add_argument('--lr', default=0.005, type=float, help='learning rate') # NOTE change for diff models
 parser.add_argument('--batch_size', default=25, type=int)
-parser.add_argument('--resume', '-r', type=int, default=1, help='resume from checkpoint')
-parser.add_argument('--epochs', '-e', type=int, default=2, help='Number of epochs to train.')
+parser.add_argument('--resume', '-r', type=int, default=0, help='resume from checkpoint')
+parser.add_argument('--epochs', '-e', type=int, default=1, help='Number of epochs to train.')
 
 # Loss network trainer
 parser.add_argument('--lresume', type=int, default=1, help='resume loss from checkpoint')
@@ -41,6 +41,10 @@ print('==> Preparing data..')
 with open("../save/transform/logs/transform_train_loss.log", "w+") as f:
     pass 
 
+def load_audio(audio_path):
+    signal, fs = librosa.load(audio_path)
+    return signal, fs
+
 def collate_fn(data):
     data = list(filter(lambda x: type(x[1]) != int, data))
     audios, captions = zip(*data)
@@ -52,7 +56,7 @@ def collate_fn(data):
 def inp_transform(inp):
     inp = inp.numpy()
     inp = inp.flatten()
-    inp = transform_stft(inp)
+    inp, _ = transform_stft(inp)
     inp = torch.Tensor(inp)
     inp = inp.unsqueeze(0)
     return inp
@@ -171,7 +175,7 @@ def train_transformation(epoch):
     for param in conten_activ.parameters():
         param.requires_grad = False
 
-    alpha, beta = 7.5, 100 # TODO : CHANGE hyperparams
+    alpha, beta = 50, 5000 # TODO : CHANGEd from 7.5, 100
     gram = GramMatrix()
 
     style_audio = get_style()
@@ -244,48 +248,32 @@ def train_transformation(epoch):
     print('=> Transformation Network : Epoch [{}/{}], Loss:{:.4f}'.format(epoch + 1, args.epochs, train_loss))
 
 
+def test():
+    global t_net
+    t_net.load_state_dict(torch.load('../save/transform/trans_model.ckpt'))
+    #vdataset = VCTK('/home/nevronas/dataset/', download=False)
+    #dataloader = DataLoader(vdataset, batch_size=1)
+    #audio, _ = next(iter(dataloader))
+    audio, fs = load_audio('/home/nevronas/dataset/vctk/raw/p225_308.wav')
+    audio = torch.Tensor(audio)
+    audio, phase = inp_transform(audio)
+    audio = audio.to(device)
+    out = t_net(audio)
+    out = out[0].detach().cpu().numpy()
+    audio = audio[0].cpu().numpy()
+    matplotlib.image.imsave('../save/plots/input/audio.png', audio[0])
+    matplotlib.image.imsave('../save/plots/output/stylized_audio.png', out[0])
+    aud_res = reconstruction(audio[0], phase)
+    out_res = reconstruction(out[0], phase[:, :-3])
+    librosa.output.write_wav("../save/plots/input/raw_audio.wav", aud_res, fs)
+    librosa.output.write_wav("../save/plots/output/raw_output.wav", out_res, fs)
+    print("Testing Finished")
+
 '''
-TODO : TEST
-def test(epoch):
-    global best_acc
-    net.eval()
-    test_loss, correct, total = 0, 0, 0
-    with torch.no_grad():
-        for batch_idx, (audios, targets) in enumerate(testloader):
-            _, outputs = t_net(audios, old_class=False)
-            
-             TODO 
-                Decide how to calculate accuracy for style transfer
-            loss = loss(outputs, targets)
-            test_loss += loss.item()
-            _, predicted = outputs.max(1)
-            total += targets.size(0)
-            correct += predicted.eq(targets).sum().item()
-            with open("./logs/test_loss_{}.log".format(curr_class), "a+") as lfile:
-                lfile.write(str(test_loss / total))
-                lfile.write("\n")
-            with open("./logs/test_acc_{}.log".format(curr_class), "a+") as afile:
-                afile.write(str(correct / total))
-                afile.write("\n")
-            progress_bar(batch_idx, len(testloader), 'Loss: %.3f | Acc: %.3f%% (%d/%d)'
-                % (test_loss/(batch_idx+1), 100.*correct/total, correct, total))
-             
-
-    # Save checkpoint.
-    acc = 100.*correct/total
-    if acc > best_acc:
-        print('Saving..')
-        state = {'net': net.state_dict(), 'acc': acc, 'epoch': epoch}
-        if not os.path.isdir('../save/checkpoint'):
-            os.mkdir('../save/checkpoint')
-        torch.save(state, '../save/checkpoint/ckpt.t7')
-        best_acc = acc
+for epoch in range(lsepoch, lsepoch + args.epoch):
+    train_lossn(epoch)
 '''
-
-#for epoch in range(lsepoch, lsepoch + 5):
-#    train_lossn(epoch)
-
 for epoch in range(tsepoch, tsepoch + args.epochs):
     train_transformation(epoch)
-    #test(epoch)
 
+test()
