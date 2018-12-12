@@ -251,11 +251,11 @@ def train_transformation(epoch):
 def test():
     global t_net
     t_net.load_state_dict(torch.load('../save/transform/trans_model.ckpt'))
-    #vdataset = VCTK('/home/nevronas/dataset/', download=False)
-    #dataloader = DataLoader(vdataset, batch_size=1)
-    #audio, _ = next(iter(dataloader))
-    audio, fs = load_audio('/home/nevronas/dataset/vctk/raw/p225_308.wav')
-    audio = torch.Tensor(audio)
+    vdataset = VCTK('/home/nevronas/dataset/', download=False)
+    dataloader = DataLoader(vdataset, batch_size=1)
+    audio, _ = next(iter(dataloader))
+    #audio, fs = load_audio('/home/nevronas/dataset/vctk/raw/p225_308.wav')
+    #audio = torch.Tensor(audio)
     audio, phase = inp_transform(audio)
     audio = audio.to(device)
     out = t_net(audio)
@@ -264,9 +264,9 @@ def test():
     matplotlib.image.imsave('../save/plots/input/audio.png', audio[0])
     matplotlib.image.imsave('../save/plots/output/stylized_audio.png', out[0])
     aud_res = reconstruction(audio[0], phase)
-    out_res = reconstruction(out[0], phase[:, :-3])
-    librosa.output.write_wav("../save/plots/input/raw_audio.wav", aud_res, fs)
-    librosa.output.write_wav("../save/plots/output/raw_output.wav", out_res, fs)
+    out_res = reconstruction(out[0], phase)#[:, :-3])
+    librosa.output.write_wav("../save/plots/input/raw_audio.wav", aud_res, 48000)
+    librosa.output.write_wav("../save/plots/output/raw_output.wav", out_res, 48000)
     print("Testing Finished")
 
 '''
