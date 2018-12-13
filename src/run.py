@@ -16,7 +16,7 @@ from utils import progress_bar
 
 
 parser = argparse.ArgumentParser(description='PyTorch Audio Style Transfer')
-parser.add_argument('--lr', default=0.0005, type=float, help='learning rate') # NOTE change for diff models
+parser.add_argument('--lr', default=0.001, type=float, help='learning rate') # NOTE change for diff models
 parser.add_argument('--batch_size', default=25, type=int)
 parser.add_argument('--resume', '-r', type=int, default=0, help='resume from checkpoint')
 parser.add_argument('--epochs', '-e', type=int, default=2, help='Number of epochs to train.')
@@ -33,7 +33,7 @@ args = parser.parse_args()
 device = 'cuda' if torch.cuda.is_available() else 'cpu'
 best_acc, tsepoch, tstep, lsepoch, lstep = 0, 0, 0, 0, 0
 
-loss_fn = MaskedMSE() #torch.nn.MSELoss()
+loss_fn = torch.nn.MSELoss() # MaskedMSE()
 
 print('==> Preparing data..')
 
@@ -60,6 +60,16 @@ def inp_transform(inp):
     inp = torch.Tensor(inp)
     inp = inp.unsqueeze(0)
     return inp
+
+def test_transform(inp):
+    inp = inp.numpy()
+    inp = inp.astype(np.float32)
+    inp = inp.flatten()
+    inp, phase = transform_stft(inp, pad=False)
+    inp = torch.Tensor(inp)
+    inp = inp.unsqueeze(0)
+    inp = inp.unsqueeze(0)
+    return inp, phase
 
 print('==> Creating networks..')
 t_net = Transformation()
@@ -175,7 +185,7 @@ def train_transformation(epoch):
     for param in conten_activ.parameters():
         param.requires_grad = False
 
-    alpha, beta = 75, 5000 # TODO : CHANGEd from 7.5, 100
+    alpha, beta = 7.5, 1000 # TODO : CHANGEd from 7.5, 100
     gram = GramMatrix()
 
     style_audio = get_style()
@@ -256,7 +266,7 @@ def test():
     audio, _ = next(iter(dataloader))
     #audio, fs = load_audio('/home/nevronas/dataset/vctk/raw/p225_308.wav')
     #audio = torch.Tensor(audio)
-    audio, phase = inp_transform(audio)
+    audio, phase = test_transform(audio)
     audio = audio.to(device)
     out = t_net(audio)
     out = out[0].detach().cpu().numpy()
