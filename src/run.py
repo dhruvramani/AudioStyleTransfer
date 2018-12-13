@@ -16,10 +16,10 @@ from utils import progress_bar
 
 
 parser = argparse.ArgumentParser(description='PyTorch Audio Style Transfer')
-parser.add_argument('--lr', default=0.005, type=float, help='learning rate') # NOTE change for diff models
+parser.add_argument('--lr', default=0.0005, type=float, help='learning rate') # NOTE change for diff models
 parser.add_argument('--batch_size', default=25, type=int)
 parser.add_argument('--resume', '-r', type=int, default=0, help='resume from checkpoint')
-parser.add_argument('--epochs', '-e', type=int, default=1, help='Number of epochs to train.')
+parser.add_argument('--epochs', '-e', type=int, default=2, help='Number of epochs to train.')
 
 # Loss network trainer
 parser.add_argument('--lresume', type=int, default=1, help='resume loss from checkpoint')
@@ -175,7 +175,7 @@ def train_transformation(epoch):
     for param in conten_activ.parameters():
         param.requires_grad = False
 
-    alpha, beta = 50, 5000 # TODO : CHANGEd from 7.5, 100
+    alpha, beta = 75, 5000 # TODO : CHANGEd from 7.5, 100
     gram = GramMatrix()
 
     style_audio = get_style()
