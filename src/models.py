@@ -218,7 +218,6 @@ class Transformation(torch.nn.Module):
         self.dec = Decoder()
         self.enc.load_state_dict(torch.load('../save/transform/trans_encoder.ckpt'))
         self.dec.load_state_dict(torch.load('../save/transform/trans_decoder.ckpt'))
-
-
+        
     def forward(self, x):
         return self.dec(self.enc(x))
