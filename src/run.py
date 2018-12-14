@@ -2,6 +2,8 @@ import os
 import gc
 import torch
 import argparse
+import librosa
+import matplotlib
 import numpy as np
 import torch.nn.functional as F
 from torch.autograd import Variable
@@ -16,7 +18,7 @@ from utils import progress_bar
 
 
 parser = argparse.ArgumentParser(description='PyTorch Audio Style Transfer')
-parser.add_argument('--lr', default=0.001, type=float, help='learning rate') # NOTE change for diff models
+parser.add_argument('--lr', default=0.005, type=float, help='learning rate') # NOTE change for diff models
 parser.add_argument('--batch_size', default=25, type=int)
 parser.add_argument('--resume', '-r', type=int, default=0, help='resume from checkpoint')
 parser.add_argument('--epochs', '-e', type=int, default=2, help='Number of epochs to train.')
@@ -26,7 +28,6 @@ parser.add_argument('--lresume', type=int, default=1, help='resume loss from che
 parser.add_argument('--loss_lr', type=float, default=1e-4, help='The Learning Rate.')
 parser.add_argument('--momentum', '-lm', type=float, default=0.9, help='Momentum.')
 parser.add_argument('--decay', '-ld', type=float, default=1e-5, help='Weight decay (L2 penalty).')
-
 
 args = parser.parse_args()
 
@@ -185,7 +186,7 @@ def train_transformation(epoch):
     for param in conten_activ.parameters():
         param.requires_grad = False
 
-    alpha, beta = 7.5, 1000 # TODO : CHANGEd from 7.5, 100
+    alpha, beta = 50, 10000 # TODO : CHANGEd from 7.5, 100
     gram = GramMatrix()
 
     style_audio = get_style()
@@ -262,10 +263,10 @@ def test():
     global t_net
     t_net.load_state_dict(torch.load('../save/transform/trans_model.ckpt'))
     vdataset = VCTK('/home/nevronas/dataset/', download=False)
-    dataloader = DataLoader(vdataset, batch_size=1)
-    audio, _ = next(iter(dataloader))
-    #audio, fs = load_audio('/home/nevronas/dataset/vctk/raw/p225_308.wav')
-    #audio = torch.Tensor(audio)
+    #dataloader = DataLoader(vdataset, batch_size=1)
+    #audio, _ = next(iter(dataloader))
+    audio, fs = load_audio('/home/nevronas/dataset/vctk/raw/p225_308.wav')
+    audio = torch.Tensor(audio)
     audio, phase = test_transform(audio)
     audio = audio.to(device)
     out = t_net(audio)
@@ -274,9 +275,9 @@ def test():
     matplotlib.image.imsave('../save/plots/input/audio.png', audio[0])
     matplotlib.image.imsave('../save/plots/output/stylized_audio.png', out[0])
     aud_res = reconstruction(audio[0], phase)
-    out_res = reconstruction(out[0], phase)#[:, :-3])
-    librosa.output.write_wav("../save/plots/input/raw_audio.wav", aud_res, 48000)
-    librosa.output.write_wav("../save/plots/output/raw_output.wav", out_res, 48000)
+    out_res = reconstruction(out[0], phase[:, :-3])
+    librosa.output.write_wav("../save/plots/input/raw_audio.wav", aud_res, fs)
+    librosa.output.write_wav("../save/plots/output/raw_output.wav", out_res, fs)
     print("Testing Finished")
 
 '''
