@@ -39,7 +39,7 @@ def inp_transform(inp):
 
 def main():
 
-    trans_net = TransformationNetwork()
+    trans_net = Transformation()
     trans_net = trans_net.to(device)
     trans_net.load_state_dict(torch.load('../save/transform/trans_model.ckpt'))
     
@@ -57,7 +57,7 @@ def main():
     matplotlib.image.imsave('../save/plots/input/audio.png', audio[0])
     matplotlib.image.imsave('../save/plots/output/stylized_audio.png', out[0])
     aud_res = reconstruction(audio[0], phase)
-    out_res = reconstruction(out[0], phase)#[:, :-3])
+    out_res = reconstruction(out[0], phase[:, :-3])
     librosa.output.write_wav("../save/plots/input/raw_audio.wav", aud_res, fs)
     librosa.output.write_wav("../save/plots/output/raw_output.wav", out_res, fs)
     #invert_spectrogram(audio[0], audio[0], fs, '../save/plots/output/raw_audio.wav')
