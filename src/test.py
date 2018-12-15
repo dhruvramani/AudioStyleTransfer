@@ -39,12 +39,12 @@ def inp_transform(inp):
 
 def main():
 
-    trans_net = Transformation()
+    trans_net = TransformationNetwork()
     trans_net = trans_net.to(device)
     trans_net.load_state_dict(torch.load('../save/transform/trans_model.ckpt'))
     
-    vdataset = VCTK('/home/nevronas/dataset/', download=False)
-    dataloader = DataLoader(vdataset, batch_size=1)
+    #vdataset = VCTK('/home/nevronas/dataset/', download=False)
+    #dataloader = DataLoader(vdataset, batch_size=1)
 
     #audio, _ = next(iter(dataloader))
     audio, fs = load_audio('/home/nevronas/dataset/vctk/raw/p225_308.wav')
