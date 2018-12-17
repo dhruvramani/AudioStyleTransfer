@@ -20,8 +20,8 @@ from utils import progress_bar
 parser = argparse.ArgumentParser(description='PyTorch Audio Style Transfer')
 parser.add_argument('--lr', default=0.001, type=float, help='learning rate') # NOTE change for diff models
 parser.add_argument('--batch_size', default=25, type=int)
-parser.add_argument('--resume', '-r', type=int, default=0, help='resume from checkpoint')
-parser.add_argument('--epochs', '-e', type=int, default=2, help='Number of epochs to train.')
+parser.add_argument('--resume', '-r', type=int, default=1, help='resume from checkpoint')
+parser.add_argument('--epochs', '-e', type=int, default=4, help='Number of epochs to train.')
 
 # Loss network trainer
 parser.add_argument('--lresume', type=int, default=1, help='resume loss from checkpoint')
