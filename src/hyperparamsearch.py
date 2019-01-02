@@ -279,8 +279,8 @@ def test():
     print("Testing Finished")
 
 def hyperparamsearch():
-    learning_rates = [1.0, 0.1, 0.001, 0.0001, 0.00001]
-    alphas, betas = [200, 250, 300, 400, 500], [1000, 10000, 100000, 10000000, 500000]
+    learning_rates = [0.1, 0.001, 0.0001]
+    alphas, betas = [100, 300, 500], [ 10000, 100000, 10000000]
 
     count = 0
     for lr in learning_rates:
