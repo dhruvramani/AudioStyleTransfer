@@ -20,7 +20,7 @@ from utils import progress_bar
 parser = argparse.ArgumentParser(description='PyTorch Audio Style Transfer')
 parser.add_argument('--lr', default=0.001, type=float, help='learning rate') # NOTE change for diff models
 parser.add_argument('--batch_size', default=25, type=int)
-parser.add_argument('--resume', '-r', type=int, default=1, help='resume from checkpoint')
+parser.add_argument('--resume', '-r', type=int, default=0, help='resume from checkpoint')
 parser.add_argument('--epochs', '-e', type=int, default=4, help='Number of epochs to train.')
 
 # Loss network trainer
@@ -99,7 +99,7 @@ if(args.resume):
             tsepoch, tstep = (int(i) for i in str(f.read()).split(" "))
         print("=> Transformation network : prev epoch found")
 
-def get_style(path='../save/style/style_lady.wav'):
+def get_style(path='../save/style/meow.wav'):
     N_FFT = 128
     signal, fs = librosa.load(path)
     del fs
