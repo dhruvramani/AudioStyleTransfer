@@ -4,6 +4,7 @@ import torch
 import argparse
 import librosa
 import matplotlib
+import matplotlib.pyplot as plt
 import numpy as np
 import torch.nn.functional as F
 from torch.autograd import Variable
@@ -19,12 +20,12 @@ from utils import progress_bar
 
 parser = argparse.ArgumentParser(description='PyTorch Audio Style Transfer')
 parser.add_argument('--lr', default=0.001, type=float, help='learning rate') # NOTE change for diff models
-parser.add_argument('--batch_size', default=25, type=int)
+parser.add_argument('--batch_size', default=1, type=int)
 parser.add_argument('--resume', '-r', type=int, default=0, help='resume from checkpoint')
 parser.add_argument('--epochs', '-e', type=int, default=4, help='Number of epochs to train.')
 
 # Loss network trainer
-parser.add_argument('--lresume', type=int, default=1, help='resume loss from checkpoint')
+parser.add_argument('--lresume', type=int, default=0, help='resume loss from checkpoint')
 parser.add_argument('--loss_lr', type=float, default=1e-4, help='The Learning Rate.')
 parser.add_argument('--momentum', '-lm', type=float, default=0.9, help='Momentum.')
 parser.add_argument('--decay', '-ld', type=float, default=1e-5, help='Weight decay (L2 penalty).')
@@ -99,15 +100,18 @@ if(args.resume):
             tsepoch, tstep = (int(i) for i in str(f.read()).split(" "))
         print("=> Transformation network : prev epoch found")
 
-def get_style(path='../save/style/meow.wav'):
-    N_FFT = 128
+def get_style(path='../save/style/imperial.wav'):
+    N_FFT = 512
     signal, fs = librosa.load(path)
     del fs
     signal = librosa.stft(signal, n_fft=N_FFT)
     signal, phase = librosa.magphase(signal)
     del phase
     signal = np.log1p(signal)
+    #print(signal.shape)
+    #matplotlib.image.imsave('../save/plots/input/style.png', signal)
     signal = signal[ :, 1200:1500]
+    #matplotlib.image.imsave('../save/plots/input/style_part.png', signal)
     signal = torch.from_numpy(signal) # TODO : get style audio
     signal = signal.unsqueeze(0)
     return signal
@@ -130,16 +134,23 @@ def train_lossn(epoch):
             continue
         
         del captions
-        audios = (audios[:, :, :, 0:500].to(device), audios[:, :, :, 500:1000].to(device))
+        #print(audios.shape)
+        audios = (audios[:, :, :, 0:300].to(device), audios[:, :, :, 300:600].to(device),audios[:,:,:,600:900].to(device))
         # Might have to remove the loop,, memory
         for audio in audios:
             latent_space = encoder(audio)
             output = decoder(latent_space)
             optimizer.zero_grad()
-            loss = criterion(output, audio[:, :, :, :-3])
+            loss = loss_fn(output, audio[:, :, :, :-3])
             loss.backward()
             optimizer.step()
 
+        output = output[0].detach().cpu().numpy()
+        audio = audio[0].cpu().numpy()
+
+        matplotlib.image.imsave('../save/plots/input/encoder.png', audio[0])
+        matplotlib.image.imsave('../save/plots/input/decoder.png', output[0])
+    
         del audios
         train_loss += loss.item()
 
@@ -152,7 +163,7 @@ def train_lossn(epoch):
         torch.save(encoder.state_dict(), '../save/loss/loss_encoder.ckpt')
         torch.save(decoder.state_dict(), '../save/loss/loss_decoder.ckpt')
 
-        with open("models/info.txt", "w+") as f:
+        with open("../save/loss/info.txt", "w+") as f:
             f.write("{} {}".format(epoch, i))
 
         progress_bar(i, len(dataloader), 'Loss: %.3f' % (train_loss / (i - lstep + 1)))
@@ -186,11 +197,11 @@ def train_transformation(epoch):
     for param in conten_activ.parameters():
         param.requires_grad = False
 
-    alpha, beta = 200, 100000 # TODO : CHANGEd from 7.5, 100
+    alpha, beta = 100, 100000 # TODO : CHANGEd from 7.5, 100
     gram = GramMatrix()
 
     style_audio = get_style()
-
+   
     for i in range(tstep, len(dataloader)):
         try :
             (audios, captions) = next(dataloader)
@@ -216,7 +227,8 @@ def train_transformation(epoch):
                 sty_aud.append(style_audio)
             sty_aud = torch.stack(sty_aud).to(device)
 
-            for st_i in range(2, len(l_list)-4, 3): # NOTE : gets relu of 1, 2, 3
+            # for st_i in range(2, len(l_list)-4, 3): # NOTE : gets relu of 1, 2, 3
+            for st_i in range(2, 3):
                 st_activ = torch.nn.Sequential(*l_list[:st_i])
                 for param in st_activ.parameters():
                     param.requires_grad = False
@@ -280,11 +292,11 @@ def test():
     librosa.output.write_wav("../save/plots/output/raw_output.wav", out_res, fs)
     print("Testing Finished")
 
-'''
-for epoch in range(lsepoch, lsepoch + args.epoch):
+
+for epoch in range(lsepoch, lsepoch + args.epochs):
     train_lossn(epoch)
 '''
 for epoch in range(tsepoch, tsepoch + args.epochs):
     train_transformation(epoch)
-
+'''
 test()
