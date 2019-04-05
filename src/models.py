@@ -101,10 +101,11 @@ class outconv(nn.Module):
 class GramMatrix(torch.nn.Module):
     def forward(self, y):
         # TODO - modify this
-        (b, ch, h, w) = y.size()
-        features = y.view(b, ch, w * h)
-        features_t = features.transpose(1, 2)
-        gram = features.bmm(features_t) / (ch * h * w)
+        (b, ch, w) = y.size()
+        features = y.view(b * ch, w)
+        # features_t = features.transpose(1, 2)
+        gram = torch.mm(features, features.t())
+        # gram = features.bmm(features_t) / (ch * h * w)
         #gram = features.bmm(features_t)
         return gram
 
@@ -174,18 +175,25 @@ class Encoder(torch.nn.Module):
     def __init__(self):
         super(Encoder, self).__init__()
         self.encoder = nn.Sequential(
-            nn.Conv2d(1, 225, 5, dilation=1),  # b, 16, 10, 10
+            # nn.Conv2d(1, 225, 5, dilation=1),  # b, 16, 10, 10
+            # nn.ReLU(True),
+            # nn.BatchNorm2d(225),
+            # nn.Conv2d(225, 256, 5, stride=2),  # b, 8, 3, 3
+            # nn.ReLU(True),
+            # nn.BatchNorm2d(256),
+            # # nn.Conv2d(256, 256, 3, stride=2),   # b, 8, 2, 2
+            # # nn.ReLU(True),
+            # # nn.BatchNorm2d(256),
+            # nn.Conv2d(256, 100, 3, stride=1),   # b, 8, 2, 2
+            # nn.ReLU(True),
+            # nn.BatchNorm2d(100)
+            nn.Conv2d(1, 64, 2),
             nn.ReLU(True),
-            nn.BatchNorm2d(225),
-            nn.Conv2d(225, 256, 5, stride=2),  # b, 8, 3, 3
+            nn.Conv2d(64, 128, 2),
+            nn.ReLU(True),
+            nn.Conv2d(128, 256, 1),
             nn.ReLU(True),
             nn.BatchNorm2d(256),
-            nn.Conv2d(256, 256, 3, stride=2),   # b, 8, 2, 2
-            nn.ReLU(True),
-            nn.BatchNorm2d(256),
-            nn.Conv2d(256, 100, 3, stride=1),   # b, 8, 2, 2
-            nn.ReLU(True),
-            nn.BatchNorm2d(100)
         )
     def forward(self, x):
         x = self.encoder(x)
@@ -195,16 +203,25 @@ class Decoder(torch.nn.Module):
     def __init__(self):
         super(Decoder, self).__init__()
         self.decoder = nn.Sequential(
-            nn.ConvTranspose2d(100, 256, 3, stride=2),  # b, 16, 5, 5
+            # nn.ConvTranspose2d(100, 256, 3, stride=2),  # b, 16, 5, 5
+            # nn.ReLU(True),
+            # nn.BatchNorm2d(256),
+            # nn.ConvTranspose2d(256, 256, 5, stride=2),  # b, 16, 5, 5
+            # nn.ReLU(True),
+            # nn.BatchNorm2d(256),
+            # nn.ConvTranspose2d(256, 256, 11, stride=1),  # b, 16, 5, 5
+            # nn.ReLU(True),
+            # nn.BatchNorm2d(256),
+            # nn.Conv2d(256, 1, 1, stride=1, padding=1)
+            nn.ConvTranspose2d(256, 128, 2),
             nn.ReLU(True),
-            nn.BatchNorm2d(256),
-            nn.ConvTranspose2d(256, 256, 5, stride=2),  # b, 16, 5, 5
+            nn.BatchNorm2d(128),
+            nn.ConvTranspose2d(128, 64, 2),
             nn.ReLU(True),
-            nn.BatchNorm2d(256),
-            nn.ConvTranspose2d(256, 256, 11, stride=1),  # b, 16, 5, 5
+            # nn.BatchNorm2d(64),
+            nn.ConvTranspose2d(64, 64, 1),
             nn.ReLU(True),
-            nn.BatchNorm2d(256),
-            nn.Conv2d(256, 1, 1, stride=1, padding=1)
+            nn.ConvTranspose2d(64, 1, 1)
         )
 
     def forward(self, x):
@@ -216,8 +233,6 @@ class Transformation(torch.nn.Module):
         super(Transformation, self).__init__()
         self.enc = Encoder()
         self.dec = Decoder()
-        self.enc.load_state_dict(torch.load('../save/transform/trans_encoder.ckpt'))
-        self.dec.load_state_dict(torch.load('../save/transform/trans_decoder.ckpt'))
         
     def forward(self, x):
         return self.dec(self.enc(x))

@@ -197,7 +197,7 @@ def train_transformation(epoch):
     for param in conten_activ.parameters():
         param.requires_grad = False
 
-    alpha, beta = 100, 100000 # TODO : CHANGEd from 7.5, 100
+    alpha, beta = 100, 15000 # TODO : CHANGEd from 7.5, 100
     gram = GramMatrix()
 
     style_audio = get_style()
@@ -250,6 +250,11 @@ def train_transformation(epoch):
         
             loss.backward()
             optimizer.step()
+
+        a1 = audios[0].cpu().numpy()
+        a2 = y_t[0].detach().cpu().numpy()
+        matplotlib.image.imsave('../save/plots/transform/before.png', a1[0])
+        matplotlib.image.imsave('../save/plots/transform/after.png', a2[0])
 
         del audios
 

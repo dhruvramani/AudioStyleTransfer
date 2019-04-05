@@ -6,6 +6,11 @@ __pycache__/
 *$py.class
 
 save/
+checkpoints_lossnw/
+information_lossnw/
+pickle/
+plots/
+weights_lossnw/
 misc/Autoencoder/models/
 misc/Autoencoder/Features
 # C extensions
